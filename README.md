@@ -1,6 +1,12 @@
 # Gluster Georep Tools
 Collection of Utilities for Gluster Geo-replication
 
+Install Gluster CLI Python bindings using,
+
+    git clone https://github.com/gluster/glustercli-python.git
+    cd glustercli-python
+    sudo python setup.py install
+
 Install all the tools using,
 
     git clone https://github.com/aravindavk/gluster-georep-tools.git
