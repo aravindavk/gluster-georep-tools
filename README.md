@@ -13,7 +13,11 @@ Install all the tools using,
     cd gluster-georep-tools
     sudo python setup.py install
 
-## gluster-georep-setup
+## List of Tools
+- [gluster-georep-setup](#gluster-georep-setup)
+- [gluster-georep-status](#gluster-georep-status)
+
+### gluster-georep-setup
 Utility to setup Geo-replication easily.
 
 Usage:
@@ -43,7 +47,7 @@ or
 
 ![gluster-georep-setup in Action](https://github.com/aravindavk/gluster-georep-tools/blob/master/screenshots/gluster-georep-setup.png)
 
-## gluster-georep-status
+### gluster-georep-status
 Tool to check Geo-rep status. Reasons to use this tool instead of gluster CLI for status are
 
 - Nodes will be displayed in the same order as in Volume info
