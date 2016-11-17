@@ -15,7 +15,7 @@ setup(
               "gluster_georep_tools.status",
               "gluster_georep_tools.setup"],
     include_package_data=True,
-    install_requires=['argparse', 'paramiko'],
+    install_requires=['argparse', 'paramiko', 'glustercli'],
     entry_points={
         "console_scripts": [
             "gluster-georep-setup = gluster_georep_tools.setup.cli:main",

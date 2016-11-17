@@ -18,10 +18,23 @@ def apply_filters(status_data, args):
         session_name = "{0} ==> {1}".format(
             session[0]["mastervol"],
             session[0]["slave"].replace("ssh://", ""))
-        session_rows.append([session_name, []])
+        session_rows.append([session_name, {}, []])
+
+        summary = {
+            "active": 0,
+            "passive": 0,
+            "created": 0,
+            "stopped": 0,
+            "offline": 0,
+            "initializing": 0,
+            "faulty": 0,
+            "total": len(session)
+        }
 
         # Apply all filters, do not add if filter not satisfied
         for row in session:
+            summary[row["status"].replace("...", "").lower()] += 1
+
             # --with-status filter
             if args.with_status is not None and \
                args.with_status.lower() not in row["status"].lower():
@@ -29,11 +42,14 @@ def apply_filters(status_data, args):
 
             # --with-crawl-status filter
             if args.with_crawl_status is not None and \
-               args.with_crawl_status.lower() not in row["crawl_status"].lower():
+               args.with_crawl_status.lower() not in \
+               row["crawl_status"].lower():
                 continue
 
             # Add to final output
-            session_rows[-1][1].append(row)
+            session_rows[-1][2].append(row)
+
+        session_rows[-1][1] = summary.copy()
 
     return session_rows
 
@@ -46,7 +62,7 @@ def display_status(status_data):
                              "CRAWL STATUS", "SLAVE NODE", "LAST SYNCED",
                              "CHKPT TIME", "CHKPT COMPLETED",
                              "CHKPT COMPLETION TIME"])
-        for row in session[1]:
+        for row in session[2]:
             table.add_row([row["master_node"] + ":" + row["master_brick"],
                            row["status"], row["crawl_status"],
                            row["slave_node"], row["last_synced"],
@@ -55,11 +71,17 @@ def display_status(status_data):
                            row["checkpoint_completion_time"]])
 
         # If Table has data
-        if session[1]:
+        if session[2]:
             print table
         else:
             # When no filters match
             print "-"
+
+        print ("Active: {active} | Passive: {passive} | "
+               "Faulty: {faulty} | Created: {created} | "
+               "Offline: {offline} | Stopped: {stopped} | "
+               "Initializing: {initializing} | "
+               "Total: {total}".format(**session[1]))
 
         # Empty line in output
         print
