@@ -9,8 +9,8 @@ from setuptools import setup
 
 
 setup(
-    name="Gluster Geo-replication Tools",
-    version="0.1",
+    name="gluster-georep-tools",
+    version="0.2",
     packages=["gluster_georep_tools",
               "gluster_georep_tools.status",
               "gluster_georep_tools.setup"],
