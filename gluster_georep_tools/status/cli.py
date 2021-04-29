@@ -57,7 +57,7 @@ def apply_filters(status_data, args):
 def display_status(status_data):
     for session in status_data:
         # Display heading and initiate table
-        print "SESSION: " + session[0]
+        print("SESSION: " + session[0])
         table = PrettyTable(["MASTER", "STATUS",
                              "CRAWL STATUS", "SLAVE NODE", "LAST SYNCED",
                              "CHKPT TIME", "CHKPT COMPLETED",
@@ -72,19 +72,19 @@ def display_status(status_data):
 
         # If Table has data
         if session[2]:
-            print table
+            print(table)
         else:
             # When no filters match
-            print "-"
+            print("-")
 
-        print ("Active: {active} | Passive: {passive} | "
+        print("Active: {active} | Passive: {passive} | "
                "Faulty: {faulty} | Created: {created} | "
                "Offline: {offline} | Stopped: {stopped} | "
                "Initializing: {initializing} | "
                "Total: {total}".format(**session[1]))
 
         # Empty line in output
-        print
+        print()
 
 
 def handle_status(args):

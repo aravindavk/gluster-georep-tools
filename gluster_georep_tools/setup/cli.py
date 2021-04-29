@@ -168,7 +168,8 @@ def execute(cmd, success_msg="", failure_msg="", exitcode=-1):
     On success it can print message in stdout if specified.
     On failure, exits after writing to stderr.
     """
-    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    p = subprocess.Popen(cmd, universal_newlines=True,
+                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = p.communicate()
     if p.returncode == 0:
         if success_msg:
@@ -185,6 +186,7 @@ def get_glusterd_workdir():
     default directory /var/lib/glusterd
     """
     p = subprocess.Popen(["gluster", "system::", "getwd"],
+                         universal_newlines=True,
                          stdout=subprocess.PIPE)
 
     out, _ = p.communicate()
