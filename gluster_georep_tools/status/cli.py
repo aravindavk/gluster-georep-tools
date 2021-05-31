@@ -6,7 +6,7 @@ Gluster Geo-replication Status
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 import sys
 
-from gluster.cli import georep
+from glustercli.cli import georep
 from prettytable import PrettyTable
 
 
@@ -58,8 +58,8 @@ def display_status(status_data):
     for session in status_data:
         # Display heading and initiate table
         print("SESSION: " + session[0])
-        table = PrettyTable(["MASTER", "STATUS",
-                             "CRAWL STATUS", "SLAVE NODE", "LAST SYNCED",
+        table = PrettyTable(["PRIMARY", "STATUS",
+                             "CRAWL STATUS", "SECONDARY NODE", "LAST SYNCED",
                              "CHKPT TIME", "CHKPT COMPLETED",
                              "CHKPT COMPLETION TIME"])
         for row in session[2]:
@@ -88,42 +88,42 @@ def display_status(status_data):
 
 
 def handle_status(args):
-    slave_user = "root"
-    slave_host = None
-    slave_vol = None
+    secondary_user = "root"
+    secondary_host = None
+    secondary_vol = None
     volname = None
 
-    if args.mastervol is not None:
-        volname = args.mastervol
+    if args.primary_vol is not None:
+        volname = args.primary_vol
 
-    if args.slave is not None:
-        if "::" not in args.slave:
-            sys.stderr.write("Invalid Slave details\n")
+    if args.secondary is not None:
+        if "::" not in args.secondary:
+            sys.stderr.write("Invalid Secondary details\n")
             sys.exit(1)
 
-        slave_host_tmp, slave_vol = args.slave.split("::")
+        secondary_host_tmp, secondary_vol = args.secondary.split("::")
 
-        slave_host_data = slave_host_tmp.split("@")
-        slave_host = slave_host_data[-1]
-        if len(slave_host_data) > 1:
-            slave_user = slave_host_data[0]
+        secondary_host_data = secondary_host_tmp.split("@")
+        secondary_host = secondary_host_data[-1]
+        if len(secondary_host_data) > 1:
+            secondary_user = secondary_host_data[0]
 
     status_data = georep.status(volname=volname,
-                                slave_host=slave_host,
-                                slave_vol=slave_vol,
-                                slave_user=slave_user)
+                                slave_host=secondary_host,
+                                slave_vol=secondary_vol,
+                                slave_user=secondary_user)
 
     if not status_data:
-        if args.slave is not None:
+        if args.secondary is not None:
             sys.stderr.write("No active Geo-replication "
                              "sessions between {0} and {1}\n".format(
-                                 args.mastervol,
-                                 args.slave))
+                                 args.primary_vol,
+                                 args.secondary))
             sys.exit(1)
-        elif args.mastervol is not None and args.slave is None:
+        elif args.primary_vol is not None and args.secondary is None:
             sys.stderr.write("No active Geo-replication "
                              "sessions for {0}\n".format(
-                                 args.mastervol))
+                                 args.primary_vol))
             sys.exit(1)
 
     status_data = apply_filters(status_data, args)
@@ -133,11 +133,11 @@ def handle_status(args):
 def get_args():
     parser = ArgumentParser(formatter_class=RawDescriptionHelpFormatter,
                             description=__doc__)
-    parser.add_argument("mastervol", nargs="?", help="Master Volume Name")
-    parser.add_argument("slave", nargs="?", help="Slave details. "
-                        "[<slave_user>@]<slave_host>::<slave_vol>, "
-                        "Example: geoaccount@slavenode1::myvol or "
-                        "slavenode1::myvol in case of root user")
+    parser.add_argument("primary_vol", nargs="?", help="Primary Volume Name")
+    parser.add_argument("secondary", nargs="?", help="Secondary details. "
+                        "[<secondary_user>@]<secondary_host>::<secondary_vol>, "
+                        "Example: geoaccount@secondary_node1::myvol or "
+                        "secondary_node1::myvol in case of root user")
     parser.add_argument("--with-status",
                         help="Show only nodes with matching Status")
     parser.add_argument("--with-crawl-status",

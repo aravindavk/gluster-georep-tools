@@ -1,9 +1,4 @@
 # -*- coding: utf-8 -*-
-"""
-    georepsetup.cli.py
-    :copyright: (c) 2015 by Aravinda VK
-    :license: MIT, see LICENSE for more details.
-"""
 
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from contextlib import contextmanager
@@ -18,7 +13,7 @@ import paramiko
 
 PROG_DESCRIPTION = """
 CLI tool to setup Gluster Geo-replication Session between
-Master Gluster Volume to Slave Gluster Volume.
+Primary Gluster Volume to Secondary Gluster Volume.
 """
 BUFFER_SIZE = 104857600  # Considering buffer_size 100MB
 SESSION_MOUNT_LOG_FILE = ("/var/log/glusterfs/geo-replication"
@@ -65,7 +60,7 @@ def get_number_of_files(path):
            "-prune", "-o", "-path", path, "-o", "-print0", "-quit"]
     return execute(cmd,
                    failure_msg="Unable to count number of files "
-                   "in Slave Volume")
+                   "in Secondary Volume")
 
 
 def cleanup(hostname, volname, mnt):
@@ -197,126 +192,126 @@ def get_glusterd_workdir():
         return DEFAULT_GLUSTERD_WORKDIR
 
 
-def check_host_reachable(slavehost):
+def check_host_reachable(secondary_host):
     """
-    Check if SSH port is open for given slavehost
+    Check if SSH port is open for given secondary_host
     """
-    if is_port_enabled(slavehost, 22):
-        output_ok("{0} is Reachable(Port 22)".format(slavehost))
+    if is_port_enabled(secondary_host, 22):
+        output_ok("{0} is Reachable(Port 22)".format(secondary_host))
     else:
-        output_notok("{0} is Not Reachable(Port 22)".format(slavehost))
+        output_notok("{0} is Not Reachable(Port 22)".format(secondary_host))
 
 
-def ssh_initialize(slavehost, passwd):
+def ssh_initialize(secondary_host, passwd):
     """
     Initialize the SSH connection
     """
     ssh = paramiko.SSHClient()
     try:
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh.connect(slavehost, username="root", password=passwd)
-        output_ok("SSH Connection established root@{0}".format(slavehost))
+        ssh.connect(secondary_host, username="root", password=passwd)
+        output_ok("SSH Connection established root@{0}".format(secondary_host))
     except paramiko.ssh_exception.AuthenticationException as e:
         output_notok("Unable to establish SSH connection "
-                     "to root@{0}:\n{1}".format(slavehost, e))
+                     "to root@{0}:\n{1}".format(secondary_host, e))
 
     return ssh
 
 
 def compare_gluster_versions(ssh):
     """
-    Collect Master version by directly executing CLI command, get Slave version
-    via SSH command execution
+    Collect Primary version by directly executing CLI command, get
+    Secondary version via SSH command execution
     """
-    # Collect Gluster Version from Master
-    master_version = execute(["gluster", "--version"],
-                             failure_msg="Failed to get Gluster version "
-                             "from Master")
-    master_version = master_version.split()[1]
+    # Collect Gluster Version from Primary
+    primary_version = execute(["gluster", "--version"],
+                              failure_msg="Failed to get Gluster version "
+                              "from Primary Cluster")
+    primary_version = primary_version.split()[1]
 
-    # Collect Gluster Version from Slave
+    # Collect Gluster Version from Secondary
     stdin, stdout, stderr = ssh.exec_command("gluster --version")
     rc = stdout.channel.recv_exit_status()
     if rc != 0:
-        output_notok("Unable to get Slave Gluster Version")
+        output_notok("Unable to get Secondary Gluster Version")
 
-    slave_version = stdout.readline().split()[1]
+    secondary_version = stdout.readline().split()[1]
 
     # Check for Version mismatch
-    if master_version == slave_version:
-        output_ok("Master Volume and Slave Volume are "
-                  "compatible (Version: {0})".format(master_version))
+    if primary_version == secondary_version:
+        output_ok("Primary Volume and Secondary Volume are "
+                  "compatible (Version: {0})".format(primary_version))
     else:
-        output_notok("Master Volume({0}) and Slave Volume({1}) "
-                     "versions not Compatible".format(master_version,
-                                                      slave_version))
+        output_notok("Primary Volume({0}) and Secondary Volume({1}) "
+                     "versions not Compatible".format(primary_version,
+                                                      secondary_version))
 
 
-def compare_disk_sizes(args, slavehost, slavevol):
+def compare_disk_sizes(args, secondary_host, secondary_vol):
     """
     Compare the disk sizes and available sizes. Also
-    Check Slave volume is empty or not
+    Check Secondary volume is empty or not
     """
-    master_disk_size = None
-    slave_disk_size = None
-    master_used_size = None
-    slave_used_size = None
+    primary_disk_size = None
+    secondary_disk_size = None
+    primary_used_size = None
+    secondary_used_size = None
 
-    with glustermount("localhost", args.mastervol) as mnt:
+    with glustermount("localhost", args.primary_vol) as mnt:
         data = os.statvfs(mnt)
-        master_disk_size = data.f_blocks * data.f_bsize
-        master_used_size = ((data.f_blocks - data.f_bavail) *
+        primary_disk_size = data.f_blocks * data.f_bsize
+        primary_used_size = ((data.f_blocks - data.f_bavail) *
                             data.f_bsize)
 
-    with glustermount(slavehost, slavevol) as mnt:
+    with glustermount(secondary_host, secondary_vol) as mnt:
         if get_number_of_files(mnt):
             if not args.force:
-                cleanup(slavehost, slavevol, mnt)
+                cleanup(secondary_host, secondary_vol, mnt)
                 output_notok("{0}::{1} is not empty. Please delete existing "
                              "files in {0}::{1} and retry, or use --force to "
                              "continue without deleting the existing "
-                             "files.".format(slavehost, slavevol))
+                             "files.".format(secondary_host, secondary_vol))
             else:
-                output_warning("{0}::{1} is not empty.".format(slavehost,
-                                                               slavevol))
+                output_warning("{0}::{1} is not empty.".format(secondary_host,
+                                                               secondary_vol))
         data = os.statvfs(mnt)
-        slave_disk_size = data.f_blocks * data.f_bsize
-        slave_used_size = ((data.f_blocks - data.f_bavail) *
-                           data.f_bsize)
+        secondary_disk_size = data.f_blocks * data.f_bsize
+        secondary_used_size = ((data.f_blocks - data.f_bavail) *
+                            data.f_bsize)
 
-    if master_disk_size is None or master_used_size is None:
-        msg = "Unable to get Disk size and Used size of Master Volume"
+    if primary_disk_size is None or primary_used_size is None:
+        msg = "Unable to get Disk size and Used size of Primary Volume"
         if not args.force:
             output_notok(msg)
         else:
             output_warning(msg)
 
-    if slave_disk_size is None or slave_used_size is None:
-        msg = "Unable to get Disk size and Used size of Slave Volume"
+    if secondary_disk_size is None or secondary_used_size is None:
+        msg = "Unable to get Disk size and Used size of Secondary Volume"
         if not args.force:
             output_notok(msg)
         else:
             output_warning(msg)
 
-    if slave_disk_size < master_disk_size:
-        msg = ("Total disk size of master({0}) is greater "
-               "than disk size of slave({1})".format(
-                   human_readable_size(master_disk_size),
-                   human_readable_size(slave_disk_size)))
+    if secondary_disk_size < primary_disk_size:
+        msg = ("Total disk size of primary({0}) is greater "
+               "than disk size of secondary({1})".format(
+                   human_readable_size(primary_disk_size),
+                   human_readable_size(secondary_disk_size)))
         if not args.force:
             output_notok(msg)
         else:
             output_warning(msg)
 
-    effective_master_used_size = master_used_size + BUFFER_SIZE
-    slave_available_size = slave_disk_size - slave_used_size
-    master_available_size = master_disk_size - effective_master_used_size
+    effective_primary_used_size = primary_used_size + BUFFER_SIZE
+    secondary_available_size = secondary_disk_size - secondary_used_size
+    primary_available_size = primary_disk_size - effective_primary_used_size
 
-    if slave_available_size < master_available_size:
-        msg = ("Total available size of master({0}) is greater "
-               "than available size of slave({1})".format(
-                   human_readable_size(master_available_size),
-                   human_readable_size(slave_available_size)))
+    if secondary_available_size < primary_available_size:
+        msg = ("Total available size of primary({0}) is greater "
+               "than available size of secondary({1})".format(
+                   human_readable_size(primary_available_size),
+                   human_readable_size(secondary_available_size)))
 
         if not args.force:
             output_notok(msg)
@@ -326,7 +321,7 @@ def compare_disk_sizes(args, slavehost, slavevol):
 
 def run_gsec_create(georep_dir):
     """
-    gsec_create command to generate pem keys in all the master nodes
+    gsec_create command to generate pem keys in all the primary nodes
     and collect all pub keys to single node
     """
     execute(["gluster", "system::", "execute", "gsec_create"],
@@ -335,22 +330,22 @@ def run_gsec_create(georep_dir):
             failure_msg="Common secret pub file generation failed")
 
 
-def copy_to_main_slave_node(ssh, args, slavehost, georep_dir, pubfile):
+def copy_to_main_secondary_node(ssh, args, secondary_host, georep_dir, pubfile):
     """
-    Copy common_secret.pem.pub file to Main Slave node
+    Copy common_secret.pem.pub file to Main Secondary node
     """
-    # Copy common_secret.pem.pub file to Main Slave node
+    # Copy common_secret.pem.pub file to Main Secondary node
     ftp = ssh.open_sftp()
     ftp.put("{georep_dir}/common_secret.pem.pub".format(georep_dir=georep_dir),
             "{georep_dir}/{pubfile}".format(
                 georep_dir=georep_dir, pubfile=pubfile))
     ftp.close()
-    output_ok("common_secret.pem.pub file copied to {0}".format(slavehost))
+    output_ok("common_secret.pem.pub file copied to {0}".format(secondary_host))
 
 
-def distribute_to_all_slave_nodes(ssh, pubfile):
+def distribute_to_all_secondary_nodes(ssh, pubfile):
     """
-    Distribute the pem.pub file to all the slave nodes using
+    Distribute the pem.pub file to all the secondary nodes using
     Glusterd copy file infrastructure
     """
     stdin, stdout, stderr = ssh.exec_command(
@@ -359,42 +354,42 @@ def distribute_to_all_slave_nodes(ssh, pubfile):
 
     rc = stdout.channel.recv_exit_status()
     if rc == 0:
-        output_ok("Master SSH Keys copied to all Up "
-                  "Slave nodes")
+        output_ok("Primary SSH Keys copied to all Up "
+                  "Secondary nodes")
     else:
-        output_notok("Unable to copy Master SSH Keys to all Up "
-                     "Slave nodes")
+        output_notok("Unable to copy Primary SSH Keys to all Up "
+                     "Secondary nodes")
 
 
-def add_to_authorized_keys(ssh, pubfile, slaveuser):
+def add_to_authorized_keys(ssh, pubfile, secondary_user):
     """
-    Add these pub keys to authorized_keys file of all Slave nodes
+    Add these pub keys to authorized_keys file of all Secondary nodes
     """
     stdin, stdout, stderr = ssh.exec_command(
-        "gluster system:: execute add_secret_pub {slaveuser} "
+        "gluster system:: execute add_secret_pub {secondary_user} "
         "geo-replication/{pubfile}".format(
-            pubfile=pubfile, slaveuser=slaveuser))
+            pubfile=pubfile, secondary_user=secondary_user))
 
     rc = stdout.channel.recv_exit_status()
     if rc == 0:
-        output_ok("Updated Master SSH Keys to all Up "
-                  "Slave nodes authorized_keys file")
+        output_ok("Updated Primary SSH Keys to all Up "
+                  "Secondary nodes authorized_keys file")
     else:
-        output_notok("Unable to update Master SSH Keys to all "
-                     "Up Slave nodes authorized_keys file")
+        output_notok("Unable to update Primary SSH Keys to all "
+                     "Up Secondary nodes authorized_keys file")
 
 
-def create_georep_session(args, slaveuser, slavehost, slavevol):
+def create_georep_session(args, secondary_user, secondary_host, secondary_vol):
     """
     Create Geo-rep session using gluster volume geo-replication command
     """
-    slave = slavehost
-    if slaveuser != "root":
-        slave = "{0}@{1}".format(slaveuser, slavehost)
+    secondary = secondary_host
+    if secondary_user != "root":
+        secondary = "{0}@{1}".format(secondary_user, secondary_host)
 
     cmd = ["gluster", "volume", "geo-replication",
-           args.mastervol,
-           "{0}::{1}".format(slave, slavevol),
+           args.primary_vol,
+           "{0}::{1}".format(secondary, secondary_vol),
            "create",
            "no-verify"]
 
@@ -407,14 +402,14 @@ def create_georep_session(args, slaveuser, slavehost, slavevol):
 def setup_georep():
     """
     Main function to setup Geo-replication. Steps involved are
-    1.  Collect root@SLAVEHOST's password
+    1.  Collect root@SECONDARY_HOST's password
     2.  Check if SSH port is open
     3.  Initialize SSH Client
     4.  Compare the Gluster Versions
     5.  Compare disk sizes
     6.  Run gsec_create
-    7.  Copy common_secret.pem.pub to Main Slave node
-    8.  Distribute common_secret.pem.pub to all Slave nodes
+    7.  Copy common_secret.pem.pub to Main Secondary node
+    8.  Distribute common_secret.pem.pub to all Secondary nodes
     9.  Add to authorized_keys file
     10. Create Geo-replication Session
     """
@@ -429,56 +424,58 @@ def setup_georep():
     if args.no_color:
         USE_CLI_COLOR = False
 
-    # Collect Glusterd workdir, slave information
+    # Collect Glusterd workdir, secondary information
     georep_dir = os.path.join(get_glusterd_workdir(), "geo-replication")
-    slavehost_data, slavevol = args.slave.split("::")
-    slave = slavehost_data.split("@")
-    slavehost = slave[-1]
-    slaveuser = "root" if len(slave) == 1 else slave[0]
+    secondary_host_data, secondary_vol = args.secondary.split("::")
+    secondary = secondary_host_data.split("@")
+    secondary_host = secondary[-1]
+    secondary_user = "root" if len(secondary) == 1 else secondary[0]
 
-    # Get SLAVEHOST's root users password for administrative activities
+    # Get SECONDARY_HOST's root users password for administrative activities
     passwd_prompt_msg = ("Geo-replication session will be established "
-                         "between {mastervol} and {slave}\n"
-                         "Root password of {slavehost} is required to complete"
+                         "between {primary_vol} and {secondary}\n"
+                         "Root password of {secondary_host} is "
+                         "required to complete"
                          " the setup. NOTE: Password will not be stored.\n\n"
-                         "root@{slavehost}'s password: ".format(
-                             mastervol=args.mastervol,
-                             slave=args.slave,
-                             slavehost=slavehost))
+                         "root@{secondary_host}'s password: ".format(
+                             primary_vol=args.primary_vol,
+                             secondary=args.secondary,
+                             secondary_host=secondary_host))
 
     passwd = getpass.getpass(passwd_prompt_msg)
 
     # SSH Port check: Enabled/Disabled
-    check_host_reachable(slavehost)
+    check_host_reachable(secondary_host)
 
     # Initiate SSH Client
-    ssh = ssh_initialize(slavehost, passwd)
+    ssh = ssh_initialize(secondary_host, passwd)
 
-    # Compare Gluster Version in Master Cluster and Slave Cluster
+    # Compare Gluster Version in Primary Cluster and Secondary Cluster
     compare_gluster_versions(ssh)
 
-    # Compare disk size and used size to decide Master and Slave are compatible
-    # Also check if Slave is empty or not
-    compare_disk_sizes(args, slavehost, slavevol)
+    # Compare disk size and used size to decide
+    # Primary and Secondary are compatible
+    # Also check if Secondary is empty or not
+    compare_disk_sizes(args, secondary_host, secondary_vol)
 
     # Run gsec_create command
     run_gsec_create(georep_dir)
 
     # Target name for Pubfile
-    pubfile = "{mastervol}_{slavevol}_common_secret.pem.pub".format(
-        mastervol=args.mastervol, slavevol=slavevol)
+    pubfile = "{primary_vol}_{secondary_vol}_common_secret.pem.pub".format(
+        primary_vol=args.primary_vol, secondary_vol=secondary_vol)
 
-    # Copy Pub file to Main Slave node
-    copy_to_main_slave_node(ssh, args, slavehost, georep_dir, pubfile)
+    # Copy Pub file to Main Secondary node
+    copy_to_main_secondary_node(ssh, args, secondary_host, georep_dir, pubfile)
 
-    # Distribute SSH Keys to All the Slave nodes
-    distribute_to_all_slave_nodes(ssh, pubfile)
+    # Distribute SSH Keys to All the Secondary nodes
+    distribute_to_all_secondary_nodes(ssh, pubfile)
 
-    # Add the SSH Keys to authorized_keys file of all Slave nodes
-    add_to_authorized_keys(ssh, pubfile, slaveuser)
+    # Add the SSH Keys to authorized_keys file of all Secondary nodes
+    add_to_authorized_keys(ssh, pubfile, secondary_user)
 
     # Last Step: Create Geo-rep Session
-    create_georep_session(args, slaveuser, slavehost, slavevol)
+    create_georep_session(args, secondary_user, secondary_host, secondary_vol)
 
 
 def get_args():
@@ -488,12 +485,13 @@ def get_args():
     parser = ArgumentParser(formatter_class=RawDescriptionHelpFormatter,
                             description=PROG_DESCRIPTION)
 
-    parser.add_argument("mastervol", help="Master Volume Name",
-                        metavar="MASTERVOL")
-    parser.add_argument("slave",
-                        help="Slave, HOSTNAME or root@HOSTNAME::SLAVEVOL "
-                        "or user@HOSTNAME::SLAVEVOL",
-                        metavar="SLAVE")
+    parser.add_argument("primary_vol", help="Primary Volume Name",
+                        metavar="PRIMARY_VOL")
+    parser.add_argument("secondary",
+                        help="Secondary, HOSTNAME or "
+                        "root@HOSTNAME::SECONDARY_VOL "
+                        "or user@HOSTNAME::SECONDARY_VOL",
+                        metavar="SECONDARY")
     parser.add_argument("--force", help="Force",
                         action="store_true")
     parser.add_argument("--no-color", help="No Terminal Colors",
