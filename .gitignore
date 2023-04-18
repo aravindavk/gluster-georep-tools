@@ -87,3 +87,5 @@ ENV/
 
 # Rope project settings
 .ropeproject
+
+gluster_georep_tools/_version.py
