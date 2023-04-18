@@ -202,18 +202,18 @@ def check_host_reachable(secondary_host):
         output_notok("{0} is Not Reachable(Port 22)".format(secondary_host))
 
 
-def ssh_initialize(secondary_host, passwd):
+def ssh_initialize(secondary_host, username, passwd):
     """
     Initialize the SSH connection
     """
     ssh = paramiko.SSHClient()
     try:
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh.connect(secondary_host, username="root", password=passwd)
-        output_ok("SSH Connection established root@{0}".format(secondary_host))
+        ssh.connect(secondary_host, username=username, password=passwd)
+        output_ok("SSH Connection established {0}@{1}".format(username, secondary_host))
     except paramiko.ssh_exception.AuthenticationException as e:
         output_notok("Unable to establish SSH connection "
-                     "to root@{0}:\n{1}".format(secondary_host, e))
+                     "to {0}@{1}:\n{2}".format(username, secondary_host, e))
 
     return ssh
 
@@ -229,8 +229,10 @@ def compare_gluster_versions(ssh):
                               "from Primary Cluster")
     primary_version = primary_version.split()[1]
 
+    sudo_pfx = "sudo " if ssh.use_sudo else ""
+
     # Collect Gluster Version from Secondary
-    stdin, stdout, stderr = ssh.exec_command("gluster --version")
+    stdin, stdout, stderr = ssh.exec_command(f"{sudo_pfx} gluster --version")
     rc = stdout.channel.recv_exit_status()
     if rc != 0:
         output_notok("Unable to get Secondary Gluster Version")
@@ -334,12 +336,22 @@ def copy_to_main_secondary_node(ssh, args, secondary_host, georep_dir, pubfile):
     """
     Copy common_secret.pem.pub file to Main Secondary node
     """
+    home_dir = "/root"
+    if args.secondary_user != "root":
+        home_dir = f"/home/{args.secondary_user}"
+
     # Copy common_secret.pem.pub file to Main Secondary node
     ftp = ssh.open_sftp()
-    ftp.put("{georep_dir}/common_secret.pem.pub".format(georep_dir=georep_dir),
-            "{georep_dir}/{pubfile}".format(
-                georep_dir=georep_dir, pubfile=pubfile))
+    ftp.put(
+        f"{georep_dir}/common_secret.pem.pub",
+        f"{home_dir}/{pubfile}"
+    )
     ftp.close()
+
+    sudo_pfx = "sudo " if ssh.use_sudo else ""
+    stdin, stdout, stderr = ssh.exec_command(
+        f"{sudo_pfx}cp {home_dir}/{pubfile} {georep_dir}/{pubfile}")
+
     output_ok("common_secret.pem.pub file copied to {0}".format(secondary_host))
 
 
@@ -348,9 +360,9 @@ def distribute_to_all_secondary_nodes(ssh, pubfile):
     Distribute the pem.pub file to all the secondary nodes using
     Glusterd copy file infrastructure
     """
+    sudo_pfx = "sudo " if ssh.use_sudo else ""
     stdin, stdout, stderr = ssh.exec_command(
-        "gluster system:: copy file /geo-replication/{pubfile}".format(
-            pubfile=pubfile))
+        f"{sudo_pfx}gluster system:: copy file /geo-replication/{pubfile}")
 
     rc = stdout.channel.recv_exit_status()
     if rc == 0:
@@ -361,14 +373,15 @@ def distribute_to_all_secondary_nodes(ssh, pubfile):
                      "Secondary nodes")
 
 
-def add_to_authorized_keys(ssh, pubfile, secondary_user):
+def add_to_authorized_keys(ssh, pubfile, secondary_session_user):
     """
     Add these pub keys to authorized_keys file of all Secondary nodes
     """
+    sudo_pfx = "sudo " if ssh.use_sudo else ""
     stdin, stdout, stderr = ssh.exec_command(
-        "gluster system:: execute add_secret_pub {secondary_user} "
-        "geo-replication/{pubfile}".format(
-            pubfile=pubfile, secondary_user=secondary_user))
+        f"{sudo_pfx}gluster system:: execute add_secret_pub {secondary_session_user} "
+        f"geo-replication/{pubfile}"
+    )
 
     rc = stdout.channel.recv_exit_status()
     if rc == 0:
@@ -379,13 +392,13 @@ def add_to_authorized_keys(ssh, pubfile, secondary_user):
                      "Up Secondary nodes authorized_keys file")
 
 
-def create_georep_session(args, secondary_user, secondary_host, secondary_vol):
+def create_georep_session(args, secondary_session_user, secondary_host, secondary_vol):
     """
     Create Geo-rep session using gluster volume geo-replication command
     """
     secondary = secondary_host
-    if secondary_user != "root":
-        secondary = "{0}@{1}".format(secondary_user, secondary_host)
+    if secondary_session_user != "root":
+        secondary = "{0}@{1}".format(secondary_session_user, secondary_host)
 
     cmd = ["gluster", "volume", "geo-replication",
            args.primary_vol,
@@ -429,18 +442,15 @@ def setup_georep():
     secondary_host_data, secondary_vol = args.secondary.split("::")
     secondary = secondary_host_data.split("@")
     secondary_host = secondary[-1]
-    secondary_user = "root" if len(secondary) == 1 else secondary[0]
+    secondary_session_user = "root" if len(secondary) == 1 else secondary[0]
 
     # Get SECONDARY_HOST's root users password for administrative activities
-    passwd_prompt_msg = ("Geo-replication session will be established "
-                         "between {primary_vol} and {secondary}\n"
-                         "Root password of {secondary_host} is "
-                         "required to complete"
-                         " the setup. NOTE: Password will not be stored.\n\n"
-                         "root@{secondary_host}'s password: ".format(
-                             primary_vol=args.primary_vol,
-                             secondary=args.secondary,
-                             secondary_host=secondary_host))
+    passwd_prompt_msg = (f"Geo-replication session will be established "
+                         f"between {args.primary_vol} and {args.secondary}\n"
+                         f"{args.secondary_user}@{secondary_host} password is "
+                         f"required to complete"
+                         f" the setup. NOTE: Password will not be stored.\n\n"
+                         f"{args.secondary_user}@{secondary_host}'s password: ")
 
     passwd = getpass.getpass(passwd_prompt_msg)
 
@@ -448,7 +458,10 @@ def setup_georep():
     check_host_reachable(secondary_host)
 
     # Initiate SSH Client
-    ssh = ssh_initialize(secondary_host, passwd)
+    ssh = ssh_initialize(secondary_host, args.secondary_user, passwd)
+
+    # Use sudo while running commands in secondary node
+    ssh.use_sudo = args.secondary_user != "root"
 
     # Compare Gluster Version in Primary Cluster and Secondary Cluster
     compare_gluster_versions(ssh)
@@ -472,10 +485,10 @@ def setup_georep():
     distribute_to_all_secondary_nodes(ssh, pubfile)
 
     # Add the SSH Keys to authorized_keys file of all Secondary nodes
-    add_to_authorized_keys(ssh, pubfile, secondary_user)
+    add_to_authorized_keys(ssh, pubfile, secondary_session_user)
 
     # Last Step: Create Geo-rep Session
-    create_georep_session(args, secondary_user, secondary_host, secondary_vol)
+    create_georep_session(args, secondary_session_user, secondary_host, secondary_vol)
 
 
 def get_args():
@@ -489,9 +502,12 @@ def get_args():
                         metavar="PRIMARY_VOL")
     parser.add_argument("secondary",
                         help="Secondary, HOSTNAME or "
-                        "root@HOSTNAME::SECONDARY_VOL "
-                        "or user@HOSTNAME::SECONDARY_VOL",
+                        "HOSTNAME::SECONDARY_VOL",
                         metavar="SECONDARY")
+    parser.add_argument(
+        "--secondary-user", default="root",
+        help="Admin user in one of the node of the secondary cluster"
+    )
     parser.add_argument("--force", help="Force",
                         action="store_true")
     parser.add_argument("--no-color", help="No Terminal Colors",

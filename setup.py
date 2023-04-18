@@ -4,12 +4,12 @@ from setuptools import setup
 
 setup(
     name="gluster-georep-tools",
-    version="0.3",
+    version="0.4",
     packages=["gluster_georep_tools",
               "gluster_georep_tools.status",
               "gluster_georep_tools.setup"],
     include_package_data=True,
-    install_requires=['argparse', 'paramiko', 'glustercli'],
+    install_requires=['paramiko', 'glustercli', 'prettytable'],
     entry_points={
         "console_scripts": [
             "gluster-georep-setup = gluster_georep_tools.setup.cli:main",
