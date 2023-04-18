@@ -1,10 +1,15 @@
 # -*- coding: utf-8 -*-
 from setuptools import setup
+from importlib.metadata import version, PackageNotFoundError
 
+try:
+    __version__ = version('gluster_georep_tools')
+except PackageNotFoundError:
+    __version__ = "unknown"
 
 setup(
     name="gluster-georep-tools",
-    version="0.4",
+    version=__version__,
     packages=["gluster_georep_tools",
               "gluster_georep_tools.status",
               "gluster_georep_tools.setup"],
