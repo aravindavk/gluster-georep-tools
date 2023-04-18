@@ -16,8 +16,8 @@ def apply_filters(status_data, args):
         # Collect the Session name and apply filter
         # Session name will be present even though filters don't match
         session_name = "{0} ==> {1}".format(
-            session[0]["mastervol"],
-            session[0]["slave"].replace("ssh://", ""))
+            session[0]["primary_volume"],
+            session[0]["secondary"].replace("ssh://", ""))
         session_rows.append([session_name, {}, []])
 
         summary = {
@@ -64,9 +64,9 @@ def display_status(status_data):
         ])
         for row in session[2]:
             table.add_row([
-                row["master_node"] + ":" + row["master_brick"],
+                row["primary_node"] + ":" + row["primary_brick"],
                 row["status"], row["crawl_status"],
-                row["slave_node"], row["last_synced"]
+                row["secondary_node"], row["last_synced"]
             ])
 
         # If Table has data
@@ -107,10 +107,10 @@ def handle_status(args):
         if len(secondary_host_data) > 1:
             secondary_user = secondary_host_data[0]
 
-    status_data = georep.status(volname=volname,
-                                slave_host=secondary_host,
-                                slave_vol=secondary_vol,
-                                slave_user=secondary_user)
+    status_data = georep.status(primary_volume=volname,
+                                secondary_host=secondary_host,
+                                secondary_volume=secondary_vol,
+                                secondary_user=secondary_user)
 
     if not status_data:
         if args.secondary is not None:
