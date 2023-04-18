@@ -58,17 +58,16 @@ def display_status(status_data):
     for session in status_data:
         # Display heading and initiate table
         print("SESSION: " + session[0])
-        table = PrettyTable(["PRIMARY", "STATUS",
-                             "CRAWL STATUS", "SECONDARY NODE", "LAST SYNCED",
-                             "CHKPT TIME", "CHKPT COMPLETED",
-                             "CHKPT COMPLETION TIME"])
+        table = PrettyTable([
+            "PRIMARY", "STATUS",
+            "CRAWL STATUS", "SECONDARY NODE", "LAST SYNCED"
+        ])
         for row in session[2]:
-            table.add_row([row["master_node"] + ":" + row["master_brick"],
-                           row["status"], row["crawl_status"],
-                           row["slave_node"], row["last_synced"],
-                           row["checkpoint_time"],
-                           row["checkpoint_completed"],
-                           row["checkpoint_completion_time"]])
+            table.add_row([
+                row["master_node"] + ":" + row["master_brick"],
+                row["status"], row["crawl_status"],
+                row["slave_node"], row["last_synced"]
+            ])
 
         # If Table has data
         if session[2]:
@@ -135,9 +134,8 @@ def get_args():
                             description=__doc__)
     parser.add_argument("primary_vol", nargs="?", help="Primary Volume Name")
     parser.add_argument("secondary", nargs="?", help="Secondary details. "
-                        "[<secondary_user>@]<secondary_host>::<secondary_vol>, "
-                        "Example: geoaccount@secondary_node1::myvol or "
-                        "secondary_node1::myvol in case of root user")
+                        "<secondary_host>::<secondary_vol>, "
+                        "Example: secondary_node1::myvol")
     parser.add_argument("--with-status",
                         help="Show only nodes with matching Status")
     parser.add_argument("--with-crawl-status",

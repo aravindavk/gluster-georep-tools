@@ -2,15 +2,13 @@
 
 Collection of Utilities for Gluster Geo-replication
 
-Install Gluster CLI Python bindings using,
+Install by running the following pip command
 
-```console
-$ git clone https://github.com/gluster/glustercli-python.git
-$ cd glustercli-python
-$ sudo python setup.py install
+```
+$ pip install gluster-georep-tools
 ```
 
-Install all the tools using,
+or install by cloning the repository
 
 ```console
 $ git clone https://github.com/aravindavk/gluster-georep-tools.git
@@ -30,56 +28,39 @@ Usage:
 
 ```console
 $ gluster-georep-setup -h
-usage: gluster-georep-setup [-h] [--force] [--no-color] PRIMARY_VOL SECONDARY
+usage: gluster-georep-setup [-h] [--secondary-user SECONDARY_USER] [--force] [--no-color] PRIMARY_VOL SECONDARY
 
 CLI tool to setup Gluster Geo-replication Session between
 Primary Gluster Volume to Secondary Gluster Volume.
 
 positional arguments:
-  PRIMARY_VOL   Primary Volume Name
-  SECONDARY     Secondary, HOSTNAME or root@HOSTNAME::SECONDARY_VOL or
-              user@HOSTNAME::SECONDARY_VOL
+  PRIMARY_VOL           Primary Volume Name
+  SECONDARY             Secondary, HOSTNAME or HOSTNAME::SECONDARY_VOL
 
-optional arguments:
-  -h, --help  show this help message and exit
-  --force     Force
-  --no-color  No Terminal Colors
+options:
+  -h, --help            show this help message and exit
+  --secondary-user SECONDARY_USER
+                        Admin user in one of the node of the secondary cluster
+  --force               Force
+  --no-color            No Terminal Colors
 ```
 
 Example,
 
 ```console
-root@server1:/# gluster-georep-setup gvol1 remote1.kadalu::gvol2
-Geo-replication session will be established between gvol1 and remote1.kadalu::gvol2
-Root password of remote1.kadalu is required to complete the setup. NOTE: Password will not be stored.
+$ sudo gluster-georep-setup vol1 server2::vol2 --secondary-user ubuntu
+Geo-replication session will be established between vol1 and server2::vol2
+ubuntu@server2 password is required to complete the setup. NOTE: Password will not be stored.
 
-root@remote1.kadalu's password:
-[    OK] remote1.kadalu is Reachable(Port 22)
-[    OK] SSH Connection established root@remote1.kadalu
-[    OK] Primary Volume and Secondary Volume are compatible (Version: 7.2)
-[    OK] Common secret pub file present at /var/lib/glusterd/geo-replication/common_secret.pem.pub
-[    OK] common_secret.pem.pub file copied to remote1.kadalu
-[    OK] Primary SSH Keys copied to all Up Secondary nodes
-[    OK] Updated Primary SSH Keys to all Up Secondary nodes authorized_keys file
-[    OK] Geo-replication Session Established
-```
-
-or
-
-```console
-root@server1:/# gluster-georep-setup gvol1 geoaccount@remote1.kadalu::gvol2
-Geo-replication session will be established between gvol1 and remote1.kadalu::gvol2
-Root password of remote1.kadalu is required to complete the setup. NOTE: Password will not be stored.
-
-root@remote1.kadalu's password:
-[    OK] remote1.kadalu is Reachable(Port 22)
-[    OK] SSH Connection established root@remote1.kadalu
-[    OK] Primary Volume and Secondary Volume are compatible (Version: 7.2)
-[    OK] Common secret pub file present at /var/lib/glusterd/geo-replication/common_secret.pem.pub
-[    OK] common_secret.pem.pub file copied to remote1.kadalu
-[    OK] Primary SSH Keys copied to all Up Secondary nodes
-[    OK] Updated Primary SSH Keys to all Up Secondary nodes authorized_keys file
-[    OK] Geo-replication Session Established
+ubuntu@server2's password:
+[	OK] server2 is Reachable(Port 22)
+[	OK] SSH Connection established ubuntu@server2
+[	OK] Primary Volume and Secondary Volume are compatible (Version: 11.0)
+[	OK] Common secret pub file present at /var/lib/glusterd/geo-replication/common_secret.pem.pub
+[	OK] common_secret.pem.pub file copied to server2
+[	OK] Primary SSH Keys copied to all Up Secondary nodes
+[	OK] Updated Primary SSH Keys to all Up Secondary nodes authorized_keys file
+[	OK] Geo-replication Session Established
 ```
 
 ### gluster-georep-status
@@ -104,9 +85,8 @@ Gluster Geo-replication Status
 positional arguments:
   primary_vol           Primary Volume Name
   secondary             Secondary details.
-                        [<secondary_user>@]<secondary_host>::<secondary_vol>, Example:
-                        geoaccount@secondary_node1::myvol or secondary_node1::myvol in
-                        case of root user
+                        <secondary_host>::<secondary_vol>, Example:
+                        secondary_node1::myvol
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -130,11 +110,11 @@ Example output with two sessions
 ```console
 root@server1:/# gluster-georep-status
 SESSION: gvol1 ==> remote1.kadalu::gvol2
-+---------------------------+---------+-----------------+-------------------+---------------------+------------+-----------------+----------------------+
-|      PRIMARY              | STATUS  |   CRAWL STATUS  | SECONDARY NODE    |     LAST SYNCED     | CHKPT TIME | CHKPT COMPLETED | CHKPT COMPLETION TIME |
-+---------------------------+---------+-----------------+-------------------+---------------------+------------+-----------------+----------------------+
-| server1.kadalu:/bricks/b1 | Active  | Changelog Crawl |    remote1.kadalu | 2021-05-14 08:34:40 |    N/A     |       N/A       |          N/A         |
-| server2.kadalu:/bricks/b2 | Passive | N/A             |    remote2.kadalu | N/A                 |    N/A     |       N/A       |          N/A         |
-| server3.kadalu:/bricks/b3 | Passive | N/A             |    remote2.kadalu | N/A                 |    N/A     |       N/A       |          N/A         |
-+---------------------------+---------+-----------------+-------------------+---------------------+------------+-----------------+----------------------+
++---------------------------+---------+-----------------+-------------------+---------------------+
+|      PRIMARY              | STATUS  |   CRAWL STATUS  | SECONDARY NODE    |     LAST SYNCED     |
++---------------------------+---------+-----------------+-------------------+---------------------+
+| server1.kadalu:/bricks/b1 | Active  | Changelog Crawl |    remote1.kadalu | 2021-05-14 08:34:40 |
+| server2.kadalu:/bricks/b2 | Passive | N/A             |    remote2.kadalu | N/A                 |
+| server3.kadalu:/bricks/b3 | Passive | N/A             |    remote2.kadalu | N/A                 |
++---------------------------+---------+-----------------+-------------------+---------------------+
 ```
